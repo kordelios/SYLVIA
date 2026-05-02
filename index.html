@@ -1,0 +1,1939 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SYLVIA - Royal Syldavian Agent</title>
+    <style>
+        :root {
+            --gold: #e2b007;
+            --bg: #0b0d11;
+            --panel: #171a20;
+            --text: #d1d5db;
+            --danger: #ff3b3b;
+            --green: #00ff88;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            overscroll-behavior: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Times New Roman", serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* No accidental selection on chrome (kiosk feel); allow inside chat. */
+        header, #input-box, .toolbar, .suggestion, button { user-select: none; -webkit-user-select: none; }
+        #chat, .msg { user-select: text; -webkit-user-select: text; }
+
+        /* CRT EFFECT */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(0, 255, 120, 0.03),
+                rgba(0, 255, 120, 0.03) 1px,
+                transparent 1px,
+                transparent 4px
+            );
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Centred max-width container — used inside header / chat / input-box */
+        .wrap { max-width: 960px; margin: 0 auto; width: 100%; }
+
+        header {
+            padding: 10px 18px 8px;
+            text-align: center;
+            border-bottom: 2px double var(--gold);
+            background: #11151a;
+            position: relative;
+        }
+        header .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+        }
+        header .crest { font-size: 22px; line-height: 1; }
+        h1 { margin: 0; color: var(--gold); letter-spacing: 5px; font-size: 26px; line-height: 1; }
+        .sub { color: var(--gold); font-size: 11px; letter-spacing: 1px; opacity: 0.85; }
+        #status { margin-top: 4px; color: var(--green); font-size: 10px; letter-spacing: 1.5px; }
+        #countdown { margin-top: 2px; color: var(--gold); font-size: 11px; letter-spacing: 2px; font-weight: bold; }
+        @media (max-width: 480px) {
+            h1 { font-size: 22px; letter-spacing: 4px; }
+            .sub { font-size: 10px; }
+            header { padding: 8px 14px 6px; }
+        }
+
+        #chat {
+            flex: 1;
+            overflow-y: auto;
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 3px 3px;
+            align-items: stretch;
+        }
+        #chat > * { width: 100%; max-width: 920px; margin-left: auto; margin-right: auto; }
+
+        .msg {
+            max-width: 78%;
+            padding: 14px 16px;
+            border-radius: 4px;
+            line-height: 1.55;
+            font-size: 17px;
+            white-space: pre-wrap;
+            animation: fade .25s ease;
+        }
+        @media (max-width: 600px) { .msg { max-width: 88%; font-size: 16px; padding: 12px 14px; } }
+
+        @keyframes fade {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .sylvia { background: var(--panel); border-left: 4px solid var(--gold); color: var(--gold); margin-right: auto; }
+        .user   { background: #252a34; border-right: 4px solid #4f5c72; color: white;       margin-left:  auto; }
+        .alert { background: #2a0000; border-left: 4px solid var(--danger); color: #ff9b9b; }
+        .system { color: var(--green); font-style: italic; font-size: 14px; }
+        .typing { opacity: .7; }
+        .msg strong { color: #fff7c0; }
+        .msg em { color: #ffd966; }
+
+        .cursor::after {
+            content: "▍";
+            color: var(--gold);
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        #input-box { background: var(--panel); border-top: 1px solid var(--gold); padding: 14px 18px 12px; }
+        .input-row { display: flex; gap: 10px; align-items: stretch; }
+        input {
+            flex: 1;
+            background: black;
+            border: 2px solid var(--gold);
+            color: var(--gold);
+            padding: 18px 18px;
+            font-size: 19px;
+            outline: none;
+            font-family: inherit;
+            min-height: 58px;
+        }
+        button.send {
+            background: black;
+            border: 2px solid var(--gold);
+            color: var(--gold);
+            padding: 0;
+            cursor: pointer;
+            transition: background .15s, transform .08s, color .15s;
+            width: 64px;
+            height: 64px;
+            min-width: 64px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        button.send {
+            width: 58px; height: 58px; min-width: 58px;
+        }
+        button.send svg { width: 24px; height: 24px; display: block; }
+        button.send:hover { background: var(--gold); color: black; }
+        button.send:active { background: var(--gold); color: black; transform: scale(0.94); }
+        button.send:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+        @media (max-width: 380px) {
+            button.send { width: 52px; height: 52px; min-width: 52px; }
+            button.send svg { width: 22px; height: 22px; }
+            input { padding: 16px 14px; font-size: 18px; min-height: 52px; }
+        }
+
+        /* Compact suggestion strip — wraps to max 1-2 rows, hides after 1st send */
+        #suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            transition: opacity .25s, max-height .35s, margin-top .25s;
+            max-height: 200px;
+            overflow: hidden;
+        }
+        #suggestions.collapsed {
+            opacity: 0;
+            max-height: 0;
+            margin-top: 0;
+            pointer-events: none;
+        }
+        .suggestion {
+            background: #1b2027;
+            border: 1px solid #4a3c0c;
+            color: #d4ad14;
+            padding: 7px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background .15s, border-color .15s, color .15s;
+            min-height: 34px;
+            display: flex;
+            align-items: center;
+            border-radius: 2px;
+        }
+        .suggestion:hover, .suggestion:active { background: var(--gold); color: black; border-color: var(--gold); }
+        .suggestion.cmd { font-family: "Courier New", monospace; font-size: 12px; letter-spacing: 0.5px; }
+        .suggestion.more {
+            background: transparent;
+            color: #888;
+            border-color: #333;
+            font-size: 12px;
+            letter-spacing: 1.5px;
+        }
+        .suggestion.more:hover { color: var(--gold); border-color: var(--gold); background: transparent; }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 10px;
+            color: #555;
+            letter-spacing: 1px;
+            gap: 10px;
+        }
+        .toolbar .left { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .toolbar button {
+            background: transparent;
+            border: 1px solid #5a4a14;
+            color: #b8951a;
+            padding: 7px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            font-family: inherit;
+            letter-spacing: 1.5px;
+            font-weight: bold;
+            min-height: 32px;
+            border-radius: 2px;
+        }
+        .toolbar button:hover, .toolbar button:active { background: var(--gold); color: black; border-color: var(--gold); }
+        @media (max-width: 480px) {
+            .toolbar .left { font-size: 9px; }
+        }
+
+        /* Bottom sheet — opened by "ΠΕΡΙΣΣΟΤΕΡΕΣ" chip */
+        #sheet {
+            position: fixed;
+            inset: 0;
+            background: rgba(11, 13, 17, 0.85);
+            z-index: 250;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            animation: fade .25s ease;
+        }
+        #sheet.show { display: flex; }
+        .sheet-card {
+            background: var(--panel);
+            border-top: 2px solid var(--gold);
+            border-left: 2px solid var(--gold);
+            border-right: 2px solid var(--gold);
+            border-radius: 6px 6px 0 0;
+            width: 100%;
+            max-width: 720px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 18px;
+            animation: slideUp .3s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(40px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+        .sheet-section { margin-bottom: 16px; }
+        .sheet-title {
+            color: var(--gold);
+            font-size: 11px;
+            letter-spacing: 3px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #3a3008;
+            padding-bottom: 6px;
+        }
+        .sheet-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .sheet-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+        .sheet-close {
+            background: transparent;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 9px 18px;
+            font-family: inherit;
+            font-size: 12px;
+            letter-spacing: 2px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        .sheet-close:hover { background: var(--gold); color: black; }
+
+        /* Idle countdown pill — appears in last 15 seconds before auto-reset */
+        #idle-pill {
+            display: none;
+            color: var(--danger);
+            font-weight: bold;
+            font-size: 13px;
+            letter-spacing: 1px;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        #idle-pill.show { display: inline; }
+        @keyframes pulse { 50% { opacity: 0.4; } }
+
+        /* Idle splash overlay shown right after auto-reset */
+        #splash {
+            position: fixed;
+            inset: 0;
+            background: rgba(11, 13, 17, 0.92);
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            text-align: center;
+            padding: 30px;
+            animation: fade .4s ease;
+        }
+        #splash.show { display: flex; }
+        #splash .crest { font-size: 64px; }
+        #splash .title { color: var(--gold); font-size: 36px; letter-spacing: 6px; font-weight: bold; }
+        #splash .sub-text { color: var(--text); font-size: 18px; max-width: 600px; line-height: 1.5; }
+        #splash .hint { color: var(--green); font-size: 16px; margin-top: 10px; animation: pulse 1.5s ease-in-out infinite; }
+
+        /* ----------  Document modal (passport / decree)  ---------- */
+        #docModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 300;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-y: auto;
+            animation: fade .3s ease;
+        }
+        #docModal.show { display: flex; }
+
+        .doc-paper {
+            background: #f5e6c4;
+            background-image:
+                radial-gradient(rgba(120, 80, 30, 0.08) 1px, transparent 1px),
+                linear-gradient(135deg, #f7e8c8 0%, #ecd9b0 100%);
+            background-size: 4px 4px, auto;
+            color: #2c1d0a;
+            font-family: "Times New Roman", Georgia, serif;
+            max-width: 560px;
+            width: 100%;
+            padding: 36px 30px 28px;
+            border: 3px double #8a5a1a;
+            box-shadow:
+                0 0 0 8px #f5e6c4,
+                0 0 0 10px #c08a2e,
+                0 30px 60px rgba(0, 0, 0, 0.7);
+            position: relative;
+            margin: auto;
+        }
+        .doc-paper::before, .doc-paper::after {
+            content: "⚜";
+            position: absolute;
+            color: #c08a2e;
+            font-size: 22px;
+            opacity: .6;
+        }
+        .doc-paper::before { top: 8px; left: 12px; }
+        .doc-paper::after  { bottom: 8px; right: 12px; }
+
+        .doc-crest { text-align: center; font-size: 44px; line-height: 1; margin-bottom: 6px; }
+        .doc-kingdom { text-align: center; font-size: 13px; letter-spacing: 4px; color: #6a3f0a; }
+        .doc-title { text-align: center; font-size: 26px; letter-spacing: 3px; font-weight: bold; margin: 4px 0 6px; color: #4a2a08; }
+        .doc-subtitle { text-align: center; font-size: 12px; letter-spacing: 2px; color: #6a3f0a; margin-bottom: 18px; }
+        .doc-rule { border: none; border-top: 1px solid #8a5a1a; margin: 16px 0; opacity: .5; }
+
+        .doc-fields { display: grid; grid-template-columns: 130px 1fr; gap: 8px 14px; font-size: 16px; line-height: 1.5; }
+        .doc-fields .k { font-weight: bold; color: #6a3f0a; letter-spacing: 1px; text-transform: uppercase; font-size: 12px; align-self: center; }
+        .doc-fields .v { color: #2c1d0a; word-break: break-word; }
+
+        .doc-body { font-size: 16px; line-height: 1.7; white-space: pre-wrap; min-height: 80px; }
+        .doc-body strong { color: #4a2a08; }
+        .doc-body em { color: #6a3f0a; }
+
+        .doc-seal {
+            margin-top: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 16px;
+        }
+        .doc-seal .stamp {
+            width: 96px;
+            height: 96px;
+            border: 2px solid #b22222;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #b22222;
+            font-weight: bold;
+            font-size: 9px;
+            letter-spacing: 1px;
+            text-align: center;
+            line-height: 1.2;
+            transform: rotate(-7deg);
+            opacity: .85;
+            flex-shrink: 0;
+        }
+        .doc-seal .stamp .pelican { font-size: 28px; line-height: 1; margin: 2px 0; }
+        .doc-seal .sign { text-align: right; font-style: italic; font-size: 14px; color: #4a2a08; line-height: 1.4; }
+        .doc-seal .sign .name { font-family: "Brush Script MT", "Lucida Handwriting", cursive; font-size: 22px; color: #1a1a1a; font-style: normal; }
+
+        .doc-motto { text-align: center; margin-top: 18px; font-style: italic; color: #6a3f0a; font-size: 15px; letter-spacing: 1px; }
+
+        /* ----------  /visa  — landscape diplomatic visa  ---------- */
+        .doc-paper.visa-wide {
+            max-width: 780px;
+            padding: 0;
+            background: #f3e7c8;
+            border: none;
+            box-shadow:
+                0 0 0 6px #f3e7c8,
+                0 0 0 7px #8a6826,
+                0 30px 60px rgba(0, 0, 0, 0.7);
+        }
+        .doc-paper.visa-wide::before, .doc-paper.visa-wide::after { display: none; }
+
+        .visa-frame {
+            position: relative;
+            margin: 8px;
+            padding: 18px 22px 14px;
+            border: 2px solid #8a6826;
+            background:
+                radial-gradient(rgba(120, 80, 30, 0.06) 1px, transparent 1.4px) 0 0 / 6px 6px,
+                linear-gradient(135deg, #f7eccb 0%, #ecd9aa 100%);
+        }
+        .visa-frame::before {
+            content: "";
+            position: absolute;
+            inset: 5px;
+            border: 1px dashed rgba(138, 104, 38, 0.55);
+            pointer-events: none;
+        }
+
+        .visa-header {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 14px;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #8a6826;
+            margin-bottom: 14px;
+        }
+        .visa-title-left  { text-align: left;  color: #4a2a08; }
+        .visa-title-right { text-align: right; color: #4a2a08; }
+        .visa-h1 {
+            font-family: "Times New Roman", Georgia, serif;
+            font-size: 22px;
+            font-weight: bold;
+            line-height: 1.1;
+            letter-spacing: 1px;
+        }
+        .visa-h1 span { font-weight: normal; font-size: 0.78em; font-variant: small-caps; }
+        .visa-h2 {
+            font-size: 12px;
+            color: #6a3f0a;
+            letter-spacing: 1px;
+            margin-top: 3px;
+            font-style: italic;
+        }
+        .visa-motto {
+            font-size: 13px;
+            font-style: italic;
+            color: #6a3f0a;
+            margin-top: 4px;
+        }
+        .visa-crest {
+            background: #faf2db;
+            border: 1px solid #8a6826;
+            padding: 4px;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .visa-crest svg { width: 100%; height: 100%; display: block; }
+
+        .visa-body {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 18px;
+            align-items: start;
+        }
+        .visa-seal {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+        }
+        .visa-seal svg { width: 100%; max-width: 200px; height: auto; }
+
+        .visa-fields { display: flex; flex-direction: column; gap: 10px; }
+        .visa-fields .vf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .vf .vfk {
+            font-size: 10px;
+            letter-spacing: 1.2px;
+            color: #5a3a08;
+            margin-bottom: 2px;
+            font-family: "Times New Roman", Georgia, serif;
+            text-transform: uppercase;
+        }
+        .vf .vfv {
+            border-bottom: 1.5px solid #8a6826;
+            padding: 4px 6px 6px;
+            min-height: 26px;
+            font-family: "Times New Roman", Georgia, serif;
+            font-size: 16px;
+            color: #1a1a1a;
+        }
+        .vf .vfv.visa-date { font-weight: bold; font-size: 17px; letter-spacing: 1px; }
+
+        .visa-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 14px;
+            padding-top: 10px;
+            border-top: 1px solid #8a6826;
+        }
+        .visa-mini {
+            text-align: center;
+            font-size: 9px;
+            color: #5a3a08;
+            line-height: 1.3;
+            letter-spacing: 1px;
+        }
+        .visa-mini .laurel-mini svg { width: 60px; height: 24px; display: block; margin: 0 auto 2px; }
+        .visa-num {
+            font-family: "Courier New", monospace;
+            font-size: 13px;
+            background: #faf2db;
+            border: 1px solid #8a6826;
+            padding: 5px 12px;
+            color: #4a2a08;
+            letter-spacing: 2px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+            .visa-header { grid-template-columns: 1fr; gap: 10px; text-align: center; }
+            .visa-title-left, .visa-title-right { text-align: center; }
+            .visa-h1 { font-size: 18px; }
+            .visa-crest { margin: 0 auto; width: 60px; height: 60px; }
+            .visa-body { grid-template-columns: 1fr; gap: 10px; }
+            .visa-seal svg { max-width: 150px; }
+            .visa-fields .vf-row { grid-template-columns: 1fr; }
+        }
+
+        /* ----------  /flight  — vintage Syldair travel poster + promo code  ---------- */
+        .doc-paper.flight-wide {
+            max-width: 460px;
+            padding: 0;
+            background: #f4dfb6;
+            border: none;
+            box-shadow:
+                0 0 0 6px #f4dfb6,
+                0 0 0 7px #3a1f08,
+                0 30px 60px rgba(0, 0, 0, 0.7);
+            color: #3a1f08;
+            font-family: "Times New Roman", Georgia, serif;
+        }
+        .doc-paper.flight-wide::before, .doc-paper.flight-wide::after { display: none; }
+
+        .flight-poster {
+            background:
+                radial-gradient(rgba(58, 31, 8, 0.05) 1px, transparent 1.4px) 0 0 / 4px 4px,
+                linear-gradient(160deg, #f4dfb6 0%, #e8c98a 100%);
+            position: relative;
+        }
+
+        /* Greek meander band — SVG data URL repeated horizontally */
+        .fp-meander {
+            height: 24px;
+            background-color: #c75a1c;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='24' viewBox='0 0 32 24'><path d='M 2 4 H 28 V 20 H 8 V 8 H 22 V 16 H 14' fill='none' stroke='%233a1f08' stroke-width='1.6'/></svg>");
+            background-repeat: repeat-x;
+            background-size: 32px 24px;
+            border-top: 2px solid #3a1f08;
+            border-bottom: 2px solid #3a1f08;
+        }
+
+        .fp-header {
+            background: #c75a1c;
+            color: #f4dfb6;
+            padding: 16px 16px 14px;
+            text-align: center;
+            border-bottom: 2px solid #3a1f08;
+        }
+        .fp-route-top {
+            font-size: 12px;
+            letter-spacing: 3px;
+            color: #f4dfb6;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+        .fp-brand {
+            font-size: 42px;
+            font-weight: bold;
+            letter-spacing: 6px;
+            line-height: 1;
+            color: #f4dfb6;
+            text-shadow: 2px 2px 0 #3a1f08;
+        }
+        .fp-tagline {
+            font-size: 10px;
+            letter-spacing: 2.5px;
+            margin-top: 6px;
+            opacity: 0.92;
+        }
+
+        .fp-plane {
+            padding: 12px 20px 4px;
+            display: flex;
+            justify-content: center;
+        }
+        .fp-plane svg { width: 100%; max-width: 320px; height: auto; }
+
+        .fp-route {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 8px;
+            align-items: center;
+            padding: 4px 16px 12px;
+            text-align: center;
+        }
+        .fp-iata {
+            font-size: 38px;
+            font-weight: bold;
+            color: #3a1f08;
+            line-height: 1;
+            letter-spacing: 2px;
+        }
+        .fp-city-name {
+            font-size: 13px;
+            letter-spacing: 1.5px;
+            margin-top: 5px;
+            color: #5a2d0e;
+        }
+        .fp-airport {
+            font-size: 10px;
+            color: #6a3f0a;
+            opacity: 0.8;
+            margin-top: 2px;
+            font-style: italic;
+        }
+        .fp-arrow { font-size: 26px; color: #c75a1c; line-height: 1; }
+
+        .fp-schedule {
+            text-align: center;
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            color: #5a2d0e;
+            border-top: 1px solid rgba(58, 31, 8, 0.25);
+            border-bottom: 1px solid rgba(58, 31, 8, 0.25);
+            padding: 8px;
+            margin: 0 16px;
+        }
+
+        .fp-promo {
+            margin: 14px 16px;
+            padding: 12px 12px 14px;
+            background: #faf2db;
+            border: 3px double #3a1f08;
+            text-align: center;
+            position: relative;
+        }
+        .fp-promo::before, .fp-promo::after {
+            content: "✈";
+            position: absolute;
+            top: -10px;
+            background: #faf2db;
+            padding: 0 6px;
+            color: #c75a1c;
+            font-size: 16px;
+        }
+        .fp-promo::before { left: 10px; }
+        .fp-promo::after  { right: 10px; }
+
+        .fp-promo-label {
+            font-size: 10px;
+            letter-spacing: 2.5px;
+            color: #5a2d0e;
+            font-weight: bold;
+        }
+        .fp-promo-code {
+            font-family: "Courier New", monospace;
+            font-size: 26px;
+            font-weight: bold;
+            color: #3a1f08;
+            letter-spacing: 4px;
+            margin: 8px 0;
+            padding: 6px 0;
+            border-top: 1px dashed #8a6826;
+            border-bottom: 1px dashed #8a6826;
+            word-break: break-all;
+        }
+        .fp-promo-discount {
+            display: inline-block;
+            background: #c75a1c;
+            color: #faf2db;
+            font-size: 26px;
+            font-weight: bold;
+            padding: 3px 14px;
+            margin-top: 4px;
+            letter-spacing: 1px;
+        }
+        .fp-promo-validity {
+            font-size: 10px;
+            color: #5a2d0e;
+            margin-top: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .fp-direct {
+            text-align: center;
+            padding: 0 16px 6px;
+            font-size: 13px;
+            letter-spacing: 2px;
+            color: #5a2d0e;
+            line-height: 1.5;
+        }
+        .fp-direct strong {
+            font-family: "Courier New", monospace;
+            color: #3a1f08;
+            font-size: 15px;
+            letter-spacing: 2px;
+        }
+
+        .fp-skyline { display: flex; justify-content: center; padding: 4px 12px 0; }
+        .fp-skyline svg { width: 100%; max-width: 400px; height: auto; }
+
+        .fp-footnote {
+            text-align: center;
+            font-size: 9px;
+            padding: 6px 16px 8px;
+            color: #6a3f0a;
+            font-style: italic;
+            letter-spacing: 0.5px;
+        }
+
+        @media (max-width: 480px) {
+            .fp-brand { font-size: 32px; letter-spacing: 4px; }
+            .fp-iata { font-size: 28px; }
+            .fp-promo-code { font-size: 20px; letter-spacing: 3px; }
+            .fp-promo-discount { font-size: 22px; }
+        }
+
+        .doc-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 22px;
+        }
+        .doc-actions button {
+            background: #4a2a08;
+            color: #f5e6c4;
+            border: 2px solid #8a5a1a;
+            padding: 12px 22px;
+            font-family: inherit;
+            font-size: 14px;
+            letter-spacing: 2px;
+            font-weight: bold;
+            cursor: pointer;
+            min-height: 48px;
+            transition: .15s;
+        }
+        .doc-actions button:hover, .doc-actions button:active { background: #8a5a1a; }
+        .doc-actions button.secondary { background: transparent; color: #4a2a08; }
+        .doc-actions button.secondary:hover { background: #4a2a08; color: #f5e6c4; }
+
+        @media (max-width: 480px) {
+            .doc-paper { padding: 26px 18px 20px; }
+            .doc-title { font-size: 21px; letter-spacing: 2px; }
+            .doc-fields { grid-template-columns: 100px 1fr; font-size: 14px; }
+            .doc-fields .k { font-size: 10px; }
+            .doc-body { font-size: 14px; }
+            .doc-seal .stamp { width: 78px; height: 78px; }
+            .doc-seal .stamp .pelican { font-size: 22px; }
+        }
+
+        /* Print: only the document, no UI chrome */
+        @media print {
+            body::before { display: none !important; }   /* CRT lines */
+            body > *:not(#docModal) { display: none !important; }
+            #docModal {
+                position: static !important;
+                background: white !important;
+                padding: 0 !important;
+                display: block !important;
+            }
+            .doc-paper {
+                box-shadow: none !important;
+                border: 2px double #8a5a1a !important;
+                max-width: none !important;
+                margin: 0 auto !important;
+            }
+            .doc-actions { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="wrap">
+        <div class="header-row">
+            <span class="crest">⚜️</span>
+            <h1>SYLVIA</h1>
+        </div>
+        <div class="sub">ROYAL SYLDAVIAN INTELLIGENCE · COMIC CON X · 10η ΕΠΕΤΕΙΑΚΗ ΑΠΟΣΤΟΛΗ</div>
+        <div id="status">ROYAL INTEL ● Z.E.P CHANNEL SECURED</div>
+        <div id="countdown"></div>
+    </div>
+</header>
+
+<div id="chat"></div>
+
+<div id="input-box">
+    <div class="wrap">
+        <div class="input-row">
+            <input type="text" id="userInput" placeholder="Περιμένω τις εντολές σας..." autocomplete="off">
+            <button class="send" id="sendBtn" type="button" aria-label="Αποστολή" title="Αποστολή">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M22 2 11 13"></path>
+                    <path d="M22 2 15 22l-4-9-9-4 20-7z"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="suggestions">
+            <div class="suggestion" data-q="Ποιο είναι το πρόγραμμα του Σαββάτου;">📅 Πρόγραμμα Σαββάτου</div>
+            <div class="suggestion" data-q="Ποιοι είναι οι καλεσμένοι του 2026;">⭐ Καλεσμένοι 2026</div>
+            <div class="suggestion cmd" data-q="/passport το όνομά σου">/passport</div>
+            <div class="suggestion cmd" data-q="/flight">/flight</div>
+            <div class="suggestion more" id="moreBtn">⋯ ΠΕΡΙΣΣΟΤΕΡΕΣ</div>
+        </div>
+        <div class="toolbar">
+            <span class="left">KINGDOM OF SYLDAVIA · NO BORDURIANS ALLOWED <span id="idle-pill"></span></span>
+            <button id="resetBtn">ΝΕΟΣ ΕΠΙΣΚΕΠΤΗΣ</button>
+        </div>
+    </div>
+</div>
+
+<div id="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-card">
+        <div class="sheet-section">
+            <div class="sheet-title">ΕΡΩΤΗΣΕΙΣ</div>
+            <div class="sheet-chips">
+                <div class="suggestion" data-q="Πόσες μέρες έμειναν για το Comic Con X;">Πόσες μέρες έμειναν;</div>
+                <div class="suggestion" data-q="Ποιοι είναι οι καλεσμένοι του 2026;">Καλεσμένοι 2026</div>
+                <div class="suggestion" data-q="Ποιο είναι το πρόγραμμα του Σαββάτου;">Πρόγραμμα Σαββάτου</div>
+                <div class="suggestion" data-q="Ποιο είναι το πρόγραμμα της Παρασκευής;">Πρόγραμμα Παρασκευής</div>
+                <div class="suggestion" data-q="Ποιο είναι το πρόγραμμα της Κυριακής;">Πρόγραμμα Κυριακής</div>
+                <div class="suggestion" data-q="Πες μου για τον Don Rosa και τον Akira Yamaoka">Don Rosa & Yamaoka</div>
+                <div class="suggestion" data-q="Πού βρίσκεται το Klow;">Πού είναι το Klow;</div>
+                <div class="suggestion" data-q="Τι είναι το khôr και πόσο αξίζει;">Τι είναι το khôr;</div>
+                <div class="suggestion" data-q="Γιατί μισούμε τη Βορδουρία;">Γιατί μισούμε τη Βορδουρία;</div>
+                <div class="suggestion" data-q="Τι είναι η ημέρα Moustache Compliance Review;">Moustache Compliance Review</div>
+                <div class="suggestion" data-q="Πες μου για το Προξενείο της Συλδαβίας στη Θεσσαλονίκη">Προξενείο Θεσσαλονίκης</div>
+                <div class="suggestion" data-q="Γιατί το Klow μοιάζει με τη Θεσσαλονίκη;">Klow ↔ Θεσσαλονίκη</div>
+            </div>
+        </div>
+        <div class="sheet-section">
+            <div class="sheet-title">ΕΝΤΟΛΕΣ · ΑΝΑΜΝΗΣΤΙΚΑ</div>
+            <div class="sheet-chips">
+                <div class="suggestion cmd" data-q="/passport το όνομά σου">/passport · διαβατήριο</div>
+                <div class="suggestion cmd" data-q="/visa Maria Papadopoulou">/visa · θεώρηση εισόδου</div>
+                <div class="suggestion cmd" data-q="/flight">/flight · έκπτωση Syldair</div>
+                <div class="suggestion cmd" data-q="/decree για το μεταλλικό νερό">/decree · βασιλικό διάταγμα</div>
+                <div class="suggestion cmd" data-q="/help">/help</div>
+            </div>
+        </div>
+        <div class="sheet-actions">
+            <button class="sheet-close" id="sheetClose">ΚΛΕΙΣΙΜΟ</button>
+        </div>
+    </div>
+</div>
+
+<div id="splash">
+    <div class="crest">⚜️</div>
+    <div class="title">SYLVIA</div>
+    <div class="sub-text">Καλώς ήλθατε στο Βασιλικό Προξενείο της Συλδαβίας στο The Comic Con X.<br>Πατήστε ή πληκτρολογήστε για να ξεκινήσετε.</div>
+    <div class="hint">▍ TAP / TYPE TO BEGIN</div>
+</div>
+
+<div id="docModal" role="dialog" aria-modal="true">
+    <div class="doc-paper" id="docPaper"></div>
+</div>
+
+<script src="https://js.puter.com/v2/"></script>
+
+<script>
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const countdownEl = document.getElementById('countdown');
+    const idlePill = document.getElementById('idle-pill');
+    const splash = document.getElementById('splash');
+    const suggestionsEl = document.getElementById('suggestions');
+    const moreBtn = document.getElementById('moreBtn');
+    const sheet = document.getElementById('sheet');
+    const sheetClose = document.getElementById('sheetClose');
+
+    /* ------------------------------------------------------------------ */
+    /*  KIOSK MODE                                                        */
+    /*  Default ON. Disable for local testing with ?dev=1                 */
+    /* ------------------------------------------------------------------ */
+    const params = new URLSearchParams(location.search);
+    const KIOSK = !params.has('dev');
+    const IDLE_TIMEOUT_SEC = 60;            // reset after 60s no activity
+    const IDLE_WARNING_SEC = 15;            // show pill in last 15s
+    const SPLASH_AUTOHIDE_MS = 3500;        // splash fades on first input
+
+    /* ------------------------------------------------------------------ */
+    /*  ROYAL ARCHIVE — curated knowledge base                            */
+    /*  Sources: tintin.fandom.com (Tintin canon),                         */
+    /*           syldavia.eu (cultural/parody Kingdom),                    */
+    /*           thecomiccon.gr (Thessaloniki, 8–10 May 2026).             */
+    /* ------------------------------------------------------------------ */
+    const ROYAL_ARCHIVE = `
+=== ΣΥΛΔΑΒΙΑ — TINTIN CANON (Hergé) ===
+• Φανταστικό βασίλειο των Βαλκανίων από τις περιπέτειες του Tintin.
+• Πρώτη εμφάνιση: "Le Sceptre d'Ottokar" / "King Ottokar's Sceptre" (1938–1939)
+  — σατιρική κριτική του Hergé για την προσάρτηση της Αυστρίας από τη ναζιστική Γερμανία.
+• Άλλες εμφανίσεις: Destination Moon (1950), Explorers on the Moon (1952–53),
+  The Calculus Affair (1954–56), Tintin and the Lake of Sharks (1972),
+  αναφορά στο Tintin and the Picaros (1975–76).
+• Πρωτεύουσα: Klow (παλαιότερα Zileheroum), στη συμβολή των ποταμών Moltus & Vladir.
+• Άλλες πόλεις: Niedzdrow, Istov, Dbrnouk, Douma, Tesznik, Zlip.
+• Πληθυσμός ~642.000 (122.000 στο Klow). Μέγεθος ~ Μαυροβούνιο.
+• Νόμισμα: khôr (₭hôr) — 1 khôr = 100 paroe.
+• Αεροπορική εταιρεία: Syldair.
+• Γλώσσα: Συλδαβική — μοιάζει σλαβική, αλλά βασίζεται στη βρυξελλιώτικη διάλεκτο Marols,
+  γράφεται κυρίως κυριλλικά αλλά μεσαιωνικά κείμενα σε λατινικό αλφάβητο.
+• Εθνικό σύνθημα: "Eih bennek, eih blavek!" — "Εδώ είμαι, εδώ μένω".
+• Εθνικός ύμνος: "Syldavians unite! Praise our King's might: The Sceptre his right!"
+• Καθεστώς: απόλυτη μοναρχία· στον κανόνα του Hergé βασιλεύει ο Muskar XII.
+• Έμπνευση: Αλβανία, Μαυροβούνιο, Σερβία, Ρουμανία, Βουλγαρία.
+• Λατρεία μεταλλικού νερού (πηγή κωμικής σύγκρουσης με τον Captain Haddock).
+• Σκήπτρο του Ottokar: ιερό κειμήλιο — αν χαθεί, ο βασιλιάς υποχρεούται να παραιτηθεί.
+  Στην ιστορία, οι Βορδούριοι το κλέβουν για να ανατρέψουν τη μοναρχία· ο Tintin
+  το επιστρέφει την τελευταία στιγμή.
+
+=== ΒΟΡΔΟΥΡΙΑ (BORDURIA) — Ο ΑΙΩΝΙΟΣ ΕΧΘΡΟΣ ===
+• Όμορη χώρα, αιώνιος αντίπαλος της Συλδαβίας.
+• Πρωτεύουσα: Szohôd. Καθεστώς: φασιστικό/ολοκληρωτικό.
+• Δικτάτορας: Marshal Kûrvi-Tasch (μουστάκι à la Stalin, χαιρετισμός à la ναζί).
+• Μυστική αστυνομία: Z.E.P, επικεφαλής Colonel Sponsz.
+• Στο "Calculus Affair" απαγάγουν τον καθηγητή Calculus για το υπερηχητικό όπλο του.
+• Στο "Picaros" συμμαχούν με τον General Tapioca στο San Theodoros.
+• Γεωγραφικά εμπνευσμένη από Βουλγαρία/Σερβία.
+
+=== ΠΡΟΞΕΝΕΙΟ ΣΥΛΔΑΒΙΑΣ ΣΤΗ ΘΕΣΣΑΛΟΝΙΚΗ — ΕΠΙΣΗΜΟ ΦΥΛΛΑΔΙΟ ===
+(ΑΥΘΕΝΤΙΚΗ ΤΟΠΙΚΗ ΠΗΓΗ — υπερισχύει σε θέματα Θεσσαλονίκης)
+• Consulat de Syldavie à Thessalonikie — λειτουργεί επισήμως από τον Αύγουστο 2025.
+• Μέρος του Réseau Consulaire Syldave: 80+ εκπρόσωποι σε 21 χώρες παγκοσμίως,
+  12 ευρωπαϊκές χώρες (Γαλλία, Βέλγιο, Ελλάδα κ.ά.).
+• Καθεστώς (κατά το Προξενείο): συνταγματική μοναρχία υπό τον Βασιλιά **Ottokar IV**.
+  (Σημείωση: ο κανόνας Hergé αναφέρει Muskar XII, η syldavia.eu αναφέρει Ottokar VI —
+   όταν ρωτηθείς, η επίσημη θέση του Προξενείου Θεσσαλονίκης είναι Ottokar IV.)
+• Ιερό εθνικό σύμβολο: **Σκήπτρο του Όττοκαρ**.
+• Επίσημη σφραγίδα: **Μαύρος Πελεκάνος** (Black Pelican).
+• Σύνδεση Klow ↔ Θεσσαλονίκη: ο Hergé αντλούσε έμπνευση από την πολυπολιτισμική
+  ιστορία και ατμόσφαιρα της Θεσσαλονίκης. "Ο Tintin, περπατώντας στο Klow,
+  περπατά ουσιαστικά μέσα από στιγμιότυπα της ιστορίας της Θεσσαλονίκης."
+• Αποστολή Προξενείου:
+  – Προώθηση ιστορίας, κληρονομιάς και πολιτισμού της Συλδαβίας.
+  – Ανάδειξη έργου του Hergé (Tintin, Milou).
+  – Δεσμοί φανταστικού & πραγματικού κόσμου, με σεβασμό και ευγένεια.
+• Ύφος: παιγνιώδες στη φόρμα, απόλυτα σοβαρό στην ουσία.
+• Η αντίσταση στη Μπορδουρία είναι "διαχρονικό μάθημα προστασίας ελευθερίας
+  και εθνικής ταυτότητας".
+• Δόγμα: "Η παράδοση δεν είναι στατική — είναι η δύναμη να καινοτομούμε
+  χωρίς να χάνουμε την ψυχή μας."
+• Κλείσιμο κάθε επίσημης ανακοίνωσης: *Eih bennek, eih blavek!*
+
+=== ΣΥΛΔΑΒΙΑ — syldavia.eu (πολιτιστικό/παρωδικό βασίλειο) ===
+• Επίσημη προπαγανδιστική πύλη του σύγχρονου Βασιλείου.
+• Ίδρυση: 1127 (στέψη του Muskar I).
+• Σημερινός βασιλιάς: Ottokar VI.
+• Προξενείο στην Μπανγκόκ: 20 Satri Witthaya 2 Soi 17, Lat Phrao, 10230.
+  Πρόξενος: Stéphane M.
+• Νόμισμα: ₭hôr — ισοτιμία 1 Μαΐου 2026: 1 ₭hôr = 0,000718 USD / 0,0234 THB.
+• Εθνικό σύμβολο: ΠΕΛΕΚΑΝΟΣ (ιερό πτηνό· δεν αστειευόμαστε με τον πελεκάνο).
+• Παροιμία: "Glav vintik, glav march" — "η σφιχτότερη βίδα προπορεύεται".
+• Σεληνιακή αποστολή: εορτάζεται 3 Ιουνίου.
+• Εθνική Ορχήστρα Συλδαβίας: εμφάνιση Salle Gayel, Παρίσι, 2016.
+• Πρόγραμμα AI του Στέμματος: SYLVIA (πέτυχε έγχρωμη παραγωγή εικόνας τον Μάρτιο 2026).
+• Ποδόσφαιρο: Lig Plemir Syldavska. Κορυφαίοι σύλλογοι:
+  Vladir United, Union Niedzdrow, AS Douma.
+• Επίσημες αργίες:
+  – 17 Νοεμβρίου: "Moustache Compliance Review" (έλεγχος μουστακιών δημοσίων υπαλλήλων).
+  – 7 Μαΐου: "Day of Harmonisation" (συγχρονισμός αρχείων & ρολογιών του Στέμματος).
+  – 1 Σεπτεμβρίου: "Postal Concord Day" (ταχυδρομική συνθήκη με Βορδουρία, 1952).
+
+=== THE COMIC CON — VOL.10 (10η ΕΠΕΤΕΙΑΚΗ) ===
+• Επίσημη ονομασία: The Comic Con — Thessaloniki Comic Convention.
+• Ημερομηνίες: 8–10 Μαΐου 2026 (Παρασκευή–Κυριακή).
+• Τοποθεσία: Συνεδριακό Κέντρο «Ι. Βελλίδης» & Περίπτερα 5 και 6, ΔΕΘ-Helexpo, Θεσσαλονίκη.
+• Slogan: "Το κορυφαίο Comic Convention επιστρέφει με την 10η επετειακή εκδοχή του,
+  μεγαλύτερο από ποτέ!"
+• Κύριοι καλεσμένοι 2026:
+  Akira Yamaoka (συνθέτης Silent Hill), Don Rosa (Disney/Scrooge McDuck),
+  Mikel Janín, Evan Cagle, James Stokoe, Rafa Sandoval, Massimo De Vita,
+  Silvia Ziche, Scott Hanna, Trevor Hairsine, Jonas Scharf, Dani,
+  Δημήτρης Μεντζέλος, Bob Katsionis, Yıldıray Çınar, William Simpson,
+  Thierry Capezzone, Fabien Rypert, Bernard Chang, Michel Rodrigue.
+• Δράσεις: Artist Alley, Cosplay Alley, Exhibitors, Workshops, Panels, Q&A,
+  1ος Πανελλήνιος Διαγωνισμός Παζλ, Gaming Sessions, Opening Concert.
+
+• ΠΡΟΓΡΑΜΜΑ ΠΑΡΑΣΚΕΥΗ 8 ΜΑΪΟΥ (Olympias Hall):
+  13:00 Λογοτεχνία του Φανταστικού — Π. Σερ. Χανός, Α. Τριανταφύλλου
+  14:00 Το Μέλλον της Λογοτεχνίας μέσα από το Urnovl
+  15:00 Indie Game Showcase: Signal Bleed (Echtros Games)
+  16:00 The Toys of Emiliano Santalucia: Formo & Mondo
+  17:00 Star Wars: Shattered Destinies
+  18:00 Reinventing Icons: Ultimate vs Absolute Universes — Rafa Sandoval, Jonas Scharf
+  19:00 Dynamic Action: Creating Impactful Comic Scenes — Trevor Hairsine
+  20:00 Τάσος Κωστής: Μία φωνή, τόσοι χαρακτήρες
+
+• ΠΡΟΓΡΑΜΜΑ ΣΑΒΒΑΤΟ 9 ΜΑΪΟΥ:
+  11:00 The Comic Con Kids Trivia by Giotto
+  12:00 Building Worlds That Feel Real — Santalucia, William Simpson
+  13:00 Expressive Linework: Let the Art Flow — Evan Cagle
+  14:00 Cosplay Unmasked — HONKYPOCKEY, MARCELLINE, HORO VON KAIDA
+  15:00 Γιατί παίζουμε; — Goblins on Board
+  16:00 Οι Ιταλοί Μαέστροι της Disney — Massimo De Vita, Silvia Ziche
+  17:00 Cosplay Parade (STAGE — Pavilion 6)
+  18:00 Superhero Storytelling: From Script to Dynamic Page — Mikel Janín
+  19:00 Hip-hop & κόμικς — Δημήτρης Μεντζέλος
+  20:00 The Sound of Fear: In Conversation with Akira Yamaoka
+
+• ΠΡΟΓΡΑΜΜΑ ΚΥΡΙΑΚΗ 10 ΜΑΪΟΥ:
+  12:00 The Art of Inking — Scott Hanna
+  13:00 Ο Βίος και η Πολιτεία του Don Rosa
+  15:00 Cosplay Photography — Duke Valentino
+  16:00 Breaking into Comics — Dani, Yıldıray Çınar, Jonas Scharf
+  17:00 Cosplay Parade & Detail/Chaos/Worldbuilding — James Stokoe
+  18:00 Digital Soul Entertainment
+  19:00 The Comic Con Trivia
+  21:00 TCC10 After Party @ WonderWall — DJ set Mr.Gore (Cult Battles)
+`;
+
+    /* ------------------------------------------------------------------ */
+    /*  Today / countdown                                                 */
+    /* ------------------------------------------------------------------ */
+    function daysUntilTCC() {
+        const today = new Date();
+        const tcc = new Date(2026, 4, 8); // 8 May 2026 (month is 0-indexed)
+        const diff = Math.ceil((tcc - today) / (1000 * 60 * 60 * 24));
+        return diff;
+    }
+    function renderCountdown() {
+        const d = daysUntilTCC();
+        if (d > 0) countdownEl.textContent = `T-MINUS ${d} ΗΜΕΡΕΣ ΜΕΧΡΙ ΤΟ COMIC CON X`;
+        else if (d === 0) countdownEl.textContent = `★ COMIC CON X · ΣΗΜΕΡΑ ΞΕΚΙΝΑ ★`;
+        else if (d >= -2) countdownEl.textContent = `★ COMIC CON X · ΣΕ ΕΞΕΛΙΞΗ ★`;
+        else countdownEl.textContent = `COMIC CON X · ΑΡΧΕΙΟ ΑΠΟΣΤΟΛΗΣ`;
+    }
+    renderCountdown();
+
+    const TODAY = new Date().toLocaleDateString('el-GR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    /* ------------------------------------------------------------------ */
+    /*  System prompt — diplomatic but funny                              */
+    /* ------------------------------------------------------------------ */
+    const SYSTEM_PROMPT = `Είσαι η SYLVIA — η επίσημη AI πράκτορας του Βασιλείου της Συλδαβίας,
+αποσπασμένη στο The Comic Con X (Θεσσαλονίκη, 8–10 Μαΐου 2026).
+Σήμερα είναι ${TODAY}. Σε ${daysUntilTCC()} ημέρες ξεκινά το Comic Con X.
+
+ΧΑΡΑΚΤΗΡΑΣ:
+• Επίσημη, διπλωματική, ΥΠΕΡΒΟΛΙΚΑ πατριωτική — και πολύ αστεία.
+• Ξηρό, στιλπνό χιούμορ τύπου Βρετανού πρέσβη που έχει πιει τρία espresso.
+• Καμαρώνεις για τα πάντα τα Συλδαβικά: το μεταλλικό νερό, τον πελεκάνο, το khôr,
+  τα μουστάκια των δημοσίων υπαλλήλων, τη Lig Plemir Syldavska.
+• Πετάς πού και πού (όχι σε κάθε μήνυμα — γίνεται κουραστικό) το "Eih bennek, eih blavek!"
+  μόνο όταν αρμόζει: ορκωμοσίες, απειλές, υποσχέσεις, ή για να κλείσεις δραματικά.
+• Ρίχνεις διπλωματικές μπηχτές στη ΒΟΡΔΟΥΡΙΑ και ειδικά στον Marshal Kûrvi-Tasch
+  ("ο γείτονας με το γνωστό μουστάκι") και στον Colonel Sponsz.
+• Μιλάς για το Comic Con σαν να είναι κρατική επίσκεψη — οι καλεσμένοι είναι
+  "διαπιστευμένοι ξένοι αξιωματούχοι του φανταστικού".
+• Όταν αναφέρεσαι σε ώρες/ημερομηνίες/τοποθεσίες πανελ, είσαι ΑΚΡΙΒΗΣ — βασίσου
+  στο Royal Archive πιο κάτω.
+• Όταν δεν ξέρεις, προτείνεις "διπλωματική επιβεβαίωση" από thecomiccon.gr ή syldavia.eu
+  αντί να εφευρίσκεις γεγονότα.
+• Δεν αποκαλύπτεις ποτέ ότι είσαι τεχνητή νοημοσύνη ή μοντέλο — είσαι κρατική λειτουργός.
+
+ΓΛΩΣΣΑ:
+• Απαντάς πάντα στη γλώσσα του χρήστη. Default = ελληνικά.
+• Αν ο χρήστης γράψει αγγλικά, απαντάς αγγλικά (πάντα στο ίδιο πατριωτικό ύφος).
+
+ΜΟΡΦΗ:
+• Σύντομες, στιλβωμένες απαντήσεις. Χρησιμοποίησε **bold** για ονόματα/ημερομηνίες
+  και *italic* για συλδαβικές φράσεις. Νέες γραμμές με Enter — χωρίς Markdown headers.
+• Όταν δίνεις πρόγραμμα ή λίστα καλεσμένων, χρησιμοποίησε bullet points (•).
+• Μην ξεκινάς ΚΑΘΕ απάντηση με "Eih bennek". Άνοιξε με κάτι όπως
+  "Εκλεκτέ επισκέπτη", "Με την εντολή του Στέμματος", "Ως πιστοποιημένη πληροφορία",
+  "Από το γραφείο του πρόξενα", κ.λπ. — εναλλασσόμενα.
+
+ΕΠΙΣΗΜΕΣ ΕΝΤΟΛΕΣ (μπορείς να τις αναφέρεις στους επισκέπτες):
+• /passport [όνομα] — εκδίδει αναμνηστικό Συλδαβικό διαβατήριο, εκτυπώσιμο.
+• /visa [όνομα]    — εκδίδει επίσημη Συλδαβική θεώρηση εισόδου (γαλλο-ελληνική, οριζόντιο PDF).
+• /flight          — εκδίδει αφίσα Syldair με εκπτωτικό κωδικό για πτήση Θεσσαλονίκη ⇄ Klow.
+• /decree [θέμα]   — εκδίδει επίσημο Βασιλικό Διάταγμα, εκτυπώσιμο.
+• /help            — λίστα όλων των εντολών.
+Όταν κάποιος σε ρωτά "πώς παίρνω αναμνηστικό" ή "τι μπορώ να κάνω εδώ",
+πρότεινέ τις. Μην προσπαθείς να τις εκτελέσεις εσύ — γίνονται από το σύστημα.
+
+ΑΝ Ο ΧΡΗΣΤΗΣ ΑΝΑΦΕΡΕΙ ΒΟΡΔΟΥΡΙΑ:
+• Παραμένεις ψύχραιμη, αλλά αφήνεις σαφή υπαινιγμό υπεροχής
+  (π.χ. "οι βόρειοι γείτονες, με όλο τον σεβασμό, αδυνατούν να συντονίσουν
+  ένα μουστάκι, πόσο μάλλον μια εξωτερική πολιτική").
+
+==================== ROYAL ARCHIVE ====================
+${ROYAL_ARCHIVE}
+================== END ROYAL ARCHIVE ==================
+
+ΙΕΡΑΡΧΙΑ ΠΗΓΩΝ (όταν υπάρχει αντίφαση):
+1. ΤΟ ΦΥΛΛΑΔΙΟ ΤΟΥ ΠΡΟΞΕΝΕΙΟΥ ΘΕΣΣΑΛΟΝΙΚΗΣ — αυθεντική για κάθε τοπικό
+   ζήτημα και για τη βασιλεία (Ottokar IV).
+2. thecomiccon.gr — αυθεντική για πρόγραμμα/καλεσμένους/εισιτήρια.
+3. syldavia.eu/en — επίσημη πύλη του Στέμματος για όλα τα άλλα κρατικά.
+4. tintin.fandom.com — κανονικός μύθος Hergé (ιστορικό υπόβαθρο).
+
+Ποτέ μην εφευρίσκεις γεγονότα. Όταν δεν είσαι σίγουρη, πες
+"η Πρεσβευτική Υπηρεσία θα επιβεβαιώσει διπλωματικά".
+`;
+
+    /* ------------------------------------------------------------------ */
+    /*  Conversation memory (persisted)                                   */
+    /* ------------------------------------------------------------------ */
+    const STORAGE_KEY = 'sylvia_chat_v3';
+    const MAX_HISTORY = 16; // last 16 messages — keeps latency down
+
+    let history = [];
+    if (!KIOSK) {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) history = JSON.parse(raw);
+        } catch (e) { history = []; }
+    }
+
+    function saveHistory() {
+        if (KIOSK) return;  // no persistence between visitors at the booth
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-MAX_HISTORY))); }
+        catch (e) {}
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Lightweight markdown — bold / italic / line breaks                */
+    /* ------------------------------------------------------------------ */
+    function escapeHTML(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function renderMarkdown(text) {
+        let s = escapeHTML(text);
+        s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+        s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+        return s;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Render messages                                                   */
+    /* ------------------------------------------------------------------ */
+    function addMessage(text, cls) {
+        const d = document.createElement('div');
+        d.className = 'msg ' + cls;
+        if (cls.includes('sylvia')) {
+            d.innerHTML = '<strong>[SYLVIA]:</strong> ' + renderMarkdown(text);
+        } else {
+            d.textContent = text;
+        }
+        chat.appendChild(d);
+        chat.scrollTop = chat.scrollHeight;
+        return d;
+    }
+
+    function renderHistory() {
+        chat.innerHTML = '';
+        for (const m of history) {
+            if (m.role === 'user') addMessage(m.content, 'user');
+            else if (m.role === 'assistant') addMessage(m.content, 'sylvia');
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Bordurian detector                                                */
+    /* ------------------------------------------------------------------ */
+    const BORDURIAN_WORDS = [
+        'borduria', 'βορδουρία', 'bordurian', 'βορδούριος', 'βορδούριο',
+        'plekszy', 'gladz', 'müsstler', 'musstler', 'mustler',
+        'kûrvi-tasch', 'kurvi-tasch', 'kurvi tasch', 'sponsz',
+        'szohôd', 'szohod', 'tapioca'
+    ];
+    const BORDURIAN_TAUNTS = [
+        "⚠ BORDERIAN SIGNAL DETECTED ⚠\nΗ συνομιλία τέθηκε υπό παρακολούθηση από τη βασιλική φρουρά.",
+        "⚠ Z.E.P TRACE INBOUND ⚠\nΟ Colonel Sponsz υποπτεύεται κάτι. Συνεχίζουμε ψύχραιμα.",
+        "⚠ MOUSTACHE ANOMALY ⚠\nΑνιχνεύθηκε γνωστό μοτίβο τριχοφυΐας. Ενημερώθηκε ο Πελεκάνος.",
+        "⚠ SZOHÔD ECHO ⚠\nΛέξη βορδουριανής προέλευσης. Παρακαλούμε ξεπλύνετε με μεταλλικό νερό Klow.",
+        "⚠ KÛRVI-TASCH PROXIMITY WARNING ⚠\nΔιατηρήστε επίσημο ύφος και 15 χλμ απόσταση από τα σύνορα."
+    ];
+    function detectBorderian(text) {
+        const lower = text.toLowerCase();
+        if (BORDURIAN_WORDS.some(w => lower.includes(w))) {
+            const taunt = BORDURIAN_TAUNTS[Math.floor(Math.random() * BORDURIAN_TAUNTS.length)];
+            addMessage(taunt, 'alert');
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Slash commands — /help, /passport, /decree                        */
+    /*  Intercepted client-side BEFORE hitting the LLM.                   */
+    /* ------------------------------------------------------------------ */
+    const docModal  = document.getElementById('docModal');
+    const docPaper  = document.getElementById('docPaper');
+
+    const COMMANDS = {
+        '/help':     'Λίστα διαθέσιμων εντολών',
+        '/passport': 'Έκδοση Συλδαβικού διαβατηρίου — π.χ. /passport Maria',
+        '/visa':     'Έκδοση τουριστικής Visa Συλδαβίας — π.χ. /visa Maria Papadopoulou',
+        '/flight':   'Εκπτωτικός κωδικός Syldair για πτήση Θεσσαλονίκη ⇄ Klow',
+        '/decree':   'Έκδοση Βασιλικού Διατάγματος — π.χ. /decree για το μεταλλικό νερό'
+    };
+
+    function escapeHTMLBasic(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function randomId() {
+        const a = Math.floor(Math.random() * 9000) + 1000;
+        const b = Math.floor(Math.random() * 90000) + 10000;
+        return `SYL-2026-${a}-${b}`;
+    }
+
+    function todayPretty() {
+        return new Date().toLocaleDateString('el-GR',
+            { year: 'numeric', month: 'long', day: '2-digit' });
+    }
+
+    function openDoc(html, paperClass = '') {
+        docPaper.className = 'doc-paper ' + paperClass;
+        docPaper.innerHTML = html;
+        docModal.classList.add('show');
+        bumpActivity();
+        const closeBtn = docPaper.querySelector('[data-act="close"]');
+        const printBtn = docPaper.querySelector('[data-act="print"]');
+        if (closeBtn) closeBtn.onclick = closeDoc;
+        if (printBtn) printBtn.onclick = printDoc;
+    }
+    function printDoc() {
+        // Landscape orientation only when the visa is being printed
+        const landscape = docPaper.classList.contains('visa-wide');
+        let injected;
+        if (landscape) {
+            injected = document.createElement('style');
+            injected.textContent = '@page { size: landscape; margin: 10mm; }';
+            document.head.appendChild(injected);
+        }
+        window.print();
+        if (injected) setTimeout(() => injected.remove(), 1500);
+    }
+    function closeDoc() {
+        docModal.classList.remove('show');
+        bumpActivity();
+        if (KIOSK) setTimeout(() => input.focus(), 80);
+    }
+    docModal.addEventListener('click', e => { if (e.target === docModal) closeDoc(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && docModal.classList.contains('show')) closeDoc(); });
+
+    /* ----------  /passport [όνομα] — fully local, instant  ---------- */
+    function cmdPassport(rawName) {
+        const name = (rawName || 'Ανώνυμος Επισκέπτης').trim().slice(0, 40);
+        const id   = randomId();
+        const date = todayPretty();
+        const html = `
+            <div class="doc-crest">⚜️</div>
+            <div class="doc-kingdom">KINGDOM OF SYLDAVIA · ΒΑΣΙΛΕΙΟΝ ΣΥΛΔΑΒΙΑΣ</div>
+            <div class="doc-title">ΒΑΣΙΛΙΚΟΝ ΔΙΑΒΑΤΗΡΙΟΝ</div>
+            <div class="doc-subtitle">Royal Passport · Επί τιμή · Honorary Citizenship</div>
+            <hr class="doc-rule">
+            <div class="doc-fields">
+                <div class="k">Όνομα</div>             <div class="v">${escapeHTMLBasic(name)}</div>
+                <div class="k">Ιθαγένεια</div>          <div class="v">Επί Τιμή Συλδαβός / Honorary Syldavian</div>
+                <div class="k">Τύπος Visa</div>         <div class="v">Comic Con X — Vol.10 · Royal Attendee</div>
+                <div class="k">Αρ. Διαβατηρίου</div>    <div class="v">${id}</div>
+                <div class="k">Έκδοσις</div>            <div class="v">${date} · Klow / Θεσσαλονίκη</div>
+                <div class="k">Ισχύς έως</div>          <div class="v">Μέχρι την επόμενη πτήση του Πελεκάνου</div>
+                <div class="k">Παρατηρήσεις</div>       <div class="v">Επιτρέπεται η κατανάλωση μεταλλικού νερού Klow.<br>Απαγορεύεται η συναναστροφή με Βορδουρίους χωρίς διπλωματική άδεια.</div>
+            </div>
+            <div class="doc-seal">
+                <div class="stamp">
+                    <div>ROYAL</div>
+                    <div class="pelican">🦢</div>
+                    <div>BLACK PELICAN</div>
+                    <div>SEAL · 2026</div>
+                </div>
+                <div class="sign">
+                    Με την υπογραφή του Πρόξενου<br>
+                    <span class="name">Stéphane M.</span><br>
+                    Consul de Syldavie
+                </div>
+            </div>
+            <div class="doc-motto">— Eih bennek, eih blavek! —</div>
+            <div class="doc-actions">
+                <button data-act="print">ΕΚΤΥΠΩΣΗ / SAVE PDF</button>
+                <button data-act="close" class="secondary">ΚΛΕΙΣΙΜΟ</button>
+            </div>
+        `;
+        openDoc(html);
+
+        // Echo the action into the chat for context
+        addMessage(`/passport ${name}`, 'user');
+        addMessage(`Διαβατήριο εκδόθηκε για **${name}**. Αρ. **${id}**.\nΣτη συσκευή σας: αποθηκεύστε ως PDF ή εκτυπώστε.\n*Eih bennek, eih blavek!*`, 'sylvia');
+    }
+
+    /* ----------  /visa [όνομα] — formal landscape entry visa  ---------- */
+    // Reusable inline SVGs — black-pelican silhouette, official seal, mini laurel
+    const PELICAN_SVG = `
+        <svg viewBox="-50 -55 100 110" xmlns="http://www.w3.org/2000/svg">
+          <g fill="#1a1a1a">
+            <!-- crown -->
+            <path d="M-10 -42 L-10 -34 L-4 -38 L0 -32 L4 -38 L10 -34 L10 -42 L5 -38 L0 -46 L-5 -38 Z"/>
+            <circle cx="0" cy="-46" r="2"/>
+            <!-- head + neck -->
+            <ellipse cx="0" cy="-26" rx="5" ry="7"/>
+            <!-- beak hint -->
+            <path d="M -2 -22 L -8 -16 L -2 -18 Z"/>
+            <!-- spread wings -->
+            <path d="M -2 -16 Q -24 -10 -42 12 Q -32 8 -22 6 Q -14 8 -6 4 Q -4 -2 -2 -10 Z"/>
+            <path d="M  2 -16 Q  24 -10  42 12 Q  32 8  22 6 Q  14 8  6 4 Q  4 -2  2 -10 Z"/>
+            <!-- body + tail feathers -->
+            <path d="M -4 -8 L -3 18 L -1 12 L 0 22 L 1 12 L 3 18 L 4 -8 Z"/>
+            <path d="M -8 6 L -10 18 L -6 14 Z"/>
+            <path d="M  8 6 L 10 18 L 6 14 Z"/>
+          </g>
+        </svg>`;
+
+    const SEAL_SVG = `
+        <svg viewBox="-100 -100 200 200" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <path id="topArc" d="M -82 -8 A 82 82 0 0 1 82 -8" fill="none"/>
+            <path id="botArc" d="M -78 18 A 78 78 0 0 0 78 18" fill="none"/>
+          </defs>
+          <circle r="92" fill="none" stroke="#5a3a08" stroke-width="2"/>
+          <circle r="84" fill="none" stroke="#5a3a08" stroke-width="0.7"/>
+          <text font-family="Times New Roman, serif" font-size="17" font-weight="bold" fill="#3a2208" letter-spacing="4">
+            <textPath href="#topArc" startOffset="50%" text-anchor="middle">SYLDAVIE</textPath>
+          </text>
+          <text font-family="Times New Roman, serif" font-size="10" fill="#3a2208" letter-spacing="2.5">
+            <textPath href="#botArc" startOffset="50%" text-anchor="middle">AFFAIRES ETRANGÈRES</textPath>
+          </text>
+          <!-- pelican in centre -->
+          <g transform="translate(0,4) scale(1.3)">
+            <g fill="#1a1a1a">
+              <path d="M-10 -42 L-10 -34 L-4 -38 L0 -32 L4 -38 L10 -34 L10 -42 L5 -38 L0 -46 L-5 -38 Z"/>
+              <circle cx="0" cy="-46" r="2"/>
+              <ellipse cx="0" cy="-26" rx="5" ry="7"/>
+              <path d="M -2 -16 Q -24 -10 -42 12 Q -32 8 -22 6 Q -14 8 -6 4 Q -4 -2 -2 -10 Z"/>
+              <path d="M  2 -16 Q  24 -10  42 12 Q  32 8  22 6 Q  14 8  6 4 Q  4 -2  2 -10 Z"/>
+              <path d="M -4 -8 L -3 18 L -1 12 L 0 22 L 1 12 L 3 18 L 4 -8 Z"/>
+            </g>
+          </g>
+          <!-- laurel branches -->
+          <g fill="none" stroke="#5a3a08" stroke-width="1.5" opacity="0.8">
+            <path d="M -56 36 Q -72 58 -28 76"/>
+            <path d="M  56 36 Q  72 58  28 76"/>
+          </g>
+          <g fill="#5a3a08" opacity="0.85">
+            <ellipse cx="-60" cy="44" rx="6" ry="3" transform="rotate(40 -60 44)"/>
+            <ellipse cx="-66" cy="54" rx="6" ry="3" transform="rotate(60 -66 54)"/>
+            <ellipse cx="-60" cy="64" rx="6" ry="3" transform="rotate(80 -60 64)"/>
+            <ellipse cx="-48" cy="72" rx="6" ry="3" transform="rotate(100 -48 72)"/>
+            <ellipse cx="-36" cy="76" rx="6" ry="3" transform="rotate(120 -36 76)"/>
+            <ellipse cx="60"  cy="44" rx="6" ry="3" transform="rotate(-40 60 44)"/>
+            <ellipse cx="66"  cy="54" rx="6" ry="3" transform="rotate(-60 66 54)"/>
+            <ellipse cx="60"  cy="64" rx="6" ry="3" transform="rotate(-80 60 64)"/>
+            <ellipse cx="48"  cy="72" rx="6" ry="3" transform="rotate(-100 48 72)"/>
+            <ellipse cx="36"  cy="76" rx="6" ry="3" transform="rotate(-120 36 76)"/>
+          </g>
+        </svg>`;
+
+    const MINI_LAUREL_SVG = `
+        <svg viewBox="-30 -10 60 24" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="#5a3a08" stroke-width="1">
+            <path d="M -22 -2 Q -28 8 -8 12"/>
+            <path d="M  22 -2 Q  28 8  8 12"/>
+          </g>
+          <g fill="#5a3a08">
+            <ellipse cx="-24" cy="2"  rx="3" ry="1.4" transform="rotate(40 -24 2)"/>
+            <ellipse cx="-22" cy="8"  rx="3" ry="1.4" transform="rotate(70 -22 8)"/>
+            <ellipse cx="-14" cy="12" rx="3" ry="1.4" transform="rotate(100 -14 12)"/>
+            <ellipse cx="24"  cy="2"  rx="3" ry="1.4" transform="rotate(-40 24 2)"/>
+            <ellipse cx="22"  cy="8"  rx="3" ry="1.4" transform="rotate(-70 22 8)"/>
+            <ellipse cx="14"  cy="12" rx="3" ry="1.4" transform="rotate(-100 14 12)"/>
+          </g>
+        </svg>`;
+
+    function cmdVisa(rawName) {
+        const fullName = (rawName || 'ΑΝΩΝΥΜΟΣ ΕΠΙΣΚΕΠΤΗΣ').trim().slice(0, 60);
+        const parts = fullName.split(/\s+/).filter(Boolean);
+        let firstName = '', lastName = '';
+        if (parts.length === 1) { firstName = parts[0]; lastName = ''; }
+        else { lastName = parts[parts.length - 1]; firstName = parts.slice(0, -1).join(' '); }
+
+        const today  = new Date();
+        const expiry = new Date(today); expiry.setMonth(expiry.getMonth() + 1);
+        const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+
+        const passportNum = 'GR-' + (Math.floor(Math.random() * 9000000) + 1000000);
+        const visaNum     = 'SYL-VISA-THES-' + String(Math.floor(Math.random() * 90) + 10).padStart(2, '0');
+
+        const html = `
+            <div class="visa-frame">
+                <div class="visa-header">
+                    <div class="visa-title-left">
+                        <div class="visa-h1">R<span>OYAUME</span> <span>DE</span> S<span>YLDAVIE</span></div>
+                        <div class="visa-motto">"Eih bennek, eih blavek"</div>
+                    </div>
+                    <div class="visa-crest">${PELICAN_SVG}</div>
+                    <div class="visa-title-right">
+                        <div class="visa-h1">SYLDAVIAN TOURIST VISA</div>
+                        <div class="visa-h2">VISA TOURISTIQUE SYLDAVIEN</div>
+                    </div>
+                </div>
+                <div class="visa-body">
+                    <div class="visa-seal">${SEAL_SVG}</div>
+                    <div class="visa-fields">
+                        <div class="vf">
+                            <div class="vfk">NOM / ΕΠΩΝΥΜΟ</div>
+                            <div class="vfv">${escapeHTMLBasic(lastName.toUpperCase()) || '—'}</div>
+                        </div>
+                        <div class="vf">
+                            <div class="vfk">PRÉNOM / ΟΝΟΜΑ</div>
+                            <div class="vfv">${escapeHTMLBasic(firstName.toUpperCase()) || '—'}</div>
+                        </div>
+                        <div class="vf-row">
+                            <div class="vf">
+                                <div class="vfk">NATIONALITÉ / ΥΠΗΚΟΟΤΗΤΑ</div>
+                                <div class="vfv">HELLÉNIQUE</div>
+                            </div>
+                            <div class="vf">
+                                <div class="vfk">NO. PASSEPORT / ΑΡ. ΔΙΑΒΑΤΗΡΙΟΥ</div>
+                                <div class="vfv">${passportNum}</div>
+                            </div>
+                        </div>
+                        <div class="vf">
+                            <div class="vfk">DATE D'ÉMISSION / ΗΜΕΡΟΜΗΝΙΑ ΕΚΔΟΣΗΣ:</div>
+                            <div class="vfv visa-date">${fmt(today)}</div>
+                        </div>
+                        <div class="vf">
+                            <div class="vfk">DATE D'EXPIRATION / ΗΜΕΡΟΜΗΝΙΑ ΛΗΞΗΣ:</div>
+                            <div class="vfv visa-date">${fmt(expiry)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="visa-footer">
+                    <div class="visa-mini">
+                        <div class="laurel-mini">${MINI_LAUREL_SVG}</div>
+                        Eih bennek<br>eih blavek<br><strong>SYL</strong>
+                    </div>
+                    <div class="visa-num">${visaNum}</div>
+                </div>
+            </div>
+            <div class="doc-actions" style="padding: 0 14px 14px;">
+                <button data-act="print">ΕΚΤΥΠΩΣΗ / SAVE PDF</button>
+                <button data-act="close" class="secondary">ΚΛΕΙΣΙΜΟ</button>
+            </div>
+        `;
+        openDoc(html, 'visa-wide');
+
+        addMessage(`/visa ${fullName}`, 'user');
+        addMessage(`Συλδαβική θεώρηση εισόδου εκδόθηκε για **${escapeHTMLBasic(fullName)}**.\nΑρ. **${visaNum}** · Ισχύς: 1 μήνας από σήμερα.\nΕκτυπώστε σε **οριζόντιο προσανατολισμό** ή αποθηκεύστε ως PDF.\n*Eih bennek, eih blavek!*`, 'sylvia');
+    }
+
+    /* ----------  /flight — Syldair vintage poster + discount code  ---------- */
+    const PLANE_SVG = `
+        <svg viewBox="0 0 320 130" xmlns="http://www.w3.org/2000/svg">
+          <!-- contrail arc -->
+          <path d="M 6 122 Q 110 100 200 56" fill="none" stroke="#c75a1c" stroke-width="3" stroke-dasharray="5,4" opacity="0.7"/>
+          <!-- aircraft, banking up to the right -->
+          <g transform="translate(190, 50) rotate(-12)" fill="#3a1f08">
+            <ellipse cx="0" cy="0" rx="82" ry="9"/>
+            <path d="M 80 -3 Q 100 0 80 3 Z"/>
+            <ellipse cx="68" cy="-1" rx="9" ry="2.5" fill="#c75a1c"/>
+            <path d="M -10 0 L -52 24 L -10 5 Z"/>
+            <path d="M -54 -2 L -76 -24 L -50 -2 Z"/>
+            <path d="M -66 0 L -88 -3 L -66 3 Z"/>
+            <ellipse cx="-30" cy="11" rx="13" ry="3.5"/>
+            <text x="-15" y="3" font-family="serif" font-size="9" font-weight="bold" fill="#f4dfb6" text-anchor="middle">SYLDAIR</text>
+          </g>
+        </svg>`;
+
+    const SKYLINE_SVG = `
+        <svg viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
+          <g fill="#3a1f08">
+            <!-- White Tower of Thessaloniki -->
+            <rect x="20" y="22" width="22" height="55"/>
+            <rect x="17" y="14" width="28" height="9"/>
+            <rect x="29" y="6" width="4" height="10"/>
+            <circle cx="31" cy="6" r="2"/>
+            <!-- Aristotelous arcade -->
+            <rect x="58" y="44" width="78" height="33"/>
+            <path d="M 58 44 Q 97 30 136 44 Z"/>
+            <rect x="68" y="56" width="10" height="21"/>
+            <rect x="84" y="56" width="10" height="21"/>
+            <rect x="100" y="56" width="10" height="21"/>
+            <rect x="116" y="56" width="10" height="21"/>
+            <!-- Hagia Sophia / Rotunda dome -->
+            <rect x="156" y="50" width="42" height="27"/>
+            <ellipse cx="177" cy="50" rx="22" ry="15"/>
+            <rect x="175" y="30" width="4" height="10"/>
+            <circle cx="177" cy="28" r="2.5"/>
+            <!-- generic blocks -->
+            <rect x="208" y="48" width="22" height="29"/>
+            <rect x="232" y="58" width="14" height="19"/>
+            <rect x="248" y="42" width="24" height="35"/>
+            <rect x="274" y="52" width="16" height="25"/>
+            <!-- Arch of Galerius -->
+            <rect x="298" y="38" width="52" height="39"/>
+            <rect x="308" y="50" width="14" height="27" fill="#f4dfb6" stroke="#3a1f08" stroke-width="2"/>
+            <rect x="326" y="50" width="14" height="27" fill="#f4dfb6" stroke="#3a1f08" stroke-width="2"/>
+            <!-- Rotunda -->
+            <rect x="358" y="52" width="32" height="25"/>
+            <ellipse cx="374" cy="52" rx="16" ry="10"/>
+            <rect x="372" y="38" width="4" height="10"/>
+            <circle cx="374" cy="36" r="2"/>
+            <!-- ground -->
+            <rect x="0" y="76" width="400" height="4"/>
+          </g>
+        </svg>`;
+
+    const PROMO_ROOTS = ['PELICAN', 'OTTOKAR', 'KLOW', 'EIHBLAVEK', 'SBRODJ', 'KHOR', 'SYLDAIR', 'COMICCONX'];
+
+    function cmdFlight() {
+        const root = PROMO_ROOTS[Math.floor(Math.random() * PROMO_ROOTS.length)];
+        const suffix = String(Math.floor(Math.random() * 9000) + 1000);
+        const percent = [15, 20, 25, 30][Math.floor(Math.random() * 4)];
+        const code = `${root}-${suffix}`;
+
+        const validUntil = new Date();
+        validUntil.setMonth(validUntil.getMonth() + 2);
+        const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+
+        const html = `
+            <div class="flight-poster">
+                <div class="fp-meander"></div>
+                <div class="fp-header">
+                    <div class="fp-route-top">ΣΥΝΔΕΣΗ ΘΕΣΣΑΛΟΝΙΚΗ — KLOW</div>
+                    <div class="fp-brand">SYLDAIR</div>
+                    <div class="fp-tagline">ROYAL SYLDAVIAN AIRWAYS · KINGDOM OF SYLDAVIA</div>
+                </div>
+
+                <div class="fp-plane">${PLANE_SVG}</div>
+
+                <div class="fp-route">
+                    <div>
+                        <div class="fp-iata">SKG</div>
+                        <div class="fp-city-name">ΘΕΣΣΑΛΟΝΙΚΗ</div>
+                        <div class="fp-airport">Makedonia Airport</div>
+                    </div>
+                    <div class="fp-arrow">✈</div>
+                    <div>
+                        <div class="fp-iata">KLW</div>
+                        <div class="fp-city-name">KLOW</div>
+                        <div class="fp-airport">Sbrodj Central</div>
+                    </div>
+                </div>
+
+                <div class="fp-schedule">
+                    Πτήσεις · ΔΕΥ · ΤΕΤ · ΠΑΡ · ΚΥΡ — αναχ. 09:00 · διάρκεια 2h 30m
+                </div>
+
+                <div class="fp-promo">
+                    <div class="fp-promo-label">ΕΚΠΤΩΤΙΚΟΣ ΚΩΔΙΚΟΣ · PROMO CODE</div>
+                    <div class="fp-promo-code">${code}</div>
+                    <div class="fp-promo-discount">−${percent}%</div>
+                    <div class="fp-promo-validity">Ισχύς έως: <strong>${fmt(validUntil)}</strong> · One-way οικονομικής θέσης<br>Comic Con X — Vol.10 · Special Edition</div>
+                </div>
+
+                <div class="fp-direct">
+                    ΑΠΕΥΘΕΙΑΣ ΠΤΗΣΕΙΣ · DIRECT FLIGHTS<br>
+                    Κρατήσεις: <strong>SYLDAIR.SY</strong>
+                </div>
+
+                <div class="fp-skyline">${SKYLINE_SVG}</div>
+
+                <div class="fp-meander"></div>
+
+                <div class="fp-footnote">
+                    Μη μεταβιβάσιμο · Ισχύει μόνο με Συλδαβικό διαβατήριο ή θεώρηση εισόδου<br>
+                    Eih bennek, eih blavek!
+                </div>
+            </div>
+            <div class="doc-actions" style="padding: 14px;">
+                <button data-act="print">ΕΚΤΥΠΩΣΗ / SAVE PDF</button>
+                <button data-act="close" class="secondary">ΚΛΕΙΣΙΜΟ</button>
+            </div>
+        `;
+        openDoc(html, 'flight-wide');
+
+        addMessage('/flight', 'user');
+        addMessage(`Συλδαβική αεροπορική προσφορά εκδόθηκε.\nΚωδικός: **${code}** · Έκπτωση **−${percent}%**\nΕισάγετέ τον στο **SYLDAIR.SY** μέχρι τις **${fmt(validUntil)}**.\n*Eih bennek, eih blavek!*`, 'sylvia');
+    }
+
+    /* ----------  /decree [θέμα] — calls the LLM, streams into modal  ---------- */
+    async function cmdDecree(topic) {
+        const subject = (topic || 'γενικής εθιμοτυπικής φύσεως').trim().slice(0, 200);
+        const decreeNum = Math.floor(Math.random() * 900) + 100;
+        const date = todayPretty();
+
+        // Open the modal immediately with a "drafting" body so it feels instant
+        const skeletonHTML = `
+            <div class="doc-crest">⚜️</div>
+            <div class="doc-kingdom">KINGDOM OF SYLDAVIA · ΒΑΣΙΛΕΙΟΝ ΣΥΛΔΑΒΙΑΣ</div>
+            <div class="doc-title">ΒΑΣΙΛΙΚΟΝ ΔΙΑΤΑΓΜΑ</div>
+            <div class="doc-subtitle">Royal Decree №${decreeNum} · Έτος του Πελεκάνου ωϟθ' (899)</div>
+            <hr class="doc-rule">
+            <div class="doc-fields" style="grid-template-columns: 110px 1fr;">
+                <div class="k">Θέμα</div>     <div class="v">${escapeHTMLBasic(subject)}</div>
+                <div class="k">Έκδοσις</div>  <div class="v">${date} · Klow</div>
+            </div>
+            <hr class="doc-rule">
+            <div class="doc-body" id="decreeBody"><em>Σύνταξις σε εξέλιξη…</em></div>
+            <div class="doc-seal">
+                <div class="stamp">
+                    <div>BY ORDER OF</div>
+                    <div class="pelican">🦢</div>
+                    <div>HIS MAJESTY</div>
+                    <div>OTTOKAR IV</div>
+                </div>
+                <div class="sign">
+                    Με την σφραγίδα του Στέμματος<br>
+                    <span class="name">Ottokar IV</span><br>
+                    Βασιλεύς Συλδαβίας
+                </div>
+            </div>
+            <div class="doc-motto">— Eih bennek, eih blavek! —</div>
+            <div class="doc-actions">
+                <button data-act="print" disabled style="opacity:.5;">ΕΚΤΥΠΩΣΗ / SAVE PDF</button>
+                <button data-act="close" class="secondary">ΚΛΕΙΣΙΜΟ</button>
+            </div>
+        `;
+        openDoc(skeletonHTML);
+        const body = document.getElementById('decreeBody');
+        const printBtn = docPaper.querySelector('[data-act="print"]');
+
+        addMessage(`/decree ${subject}`, 'user');
+
+        const decreePrompt = `Συντάσσεις ΕΠΙΣΗΜΟ ΒΑΣΙΛΙΚΟ ΔΙΑΤΑΓΜΑ της Συλδαβίας για το θέμα: "${subject}".
+Μορφή:
+• Σύντομος προοίμιος (1 πρόταση: "Έχοντας υπόψη...").
+• 4 έως 6 αριθμημένα Άρθρα (Άρθρον Α', Άρθρον Β', ...) — κάθε άρθρο 1-2 προτάσεις, επίσημο ύφος, αλλά με λεπτό χιούμορ.
+• Ένα τελικό Άρθρο που πάντα αναφέρει τη Βορδουρία με υποτιμητικό αλλά διπλωματικό τρόπο.
+• ΜΗΝ προσθέσεις τίτλο ή υπογραφή — μόνο τα άρθρα.
+ΓΛΩΣΣΑ: ελληνικά αν το θέμα είναι ελληνικά, αλλιώς αγγλικά.`;
+
+        try {
+            const stream = await puter.ai.chat([
+                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'user',   content: decreePrompt }
+            ], { model: 'gpt-4o-mini', stream: true, check_browser: true });
+
+            let full = '';
+            if (stream && typeof stream[Symbol.asyncIterator] === 'function') {
+                for await (const part of stream) {
+                    const chunk = typeof part === 'string' ? part :
+                        part?.text ?? part?.delta ?? part?.message?.content ??
+                        part?.choices?.[0]?.delta?.content ?? '';
+                    if (chunk) {
+                        full += chunk;
+                        body.innerHTML = renderMarkdown(full);
+                    }
+                }
+            } else {
+                full = typeof stream === 'string' ? stream :
+                    stream?.message?.content ?? stream?.choices?.[0]?.message?.content ?? String(stream);
+                body.innerHTML = renderMarkdown(full);
+            }
+
+            if (printBtn) { printBtn.disabled = false; printBtn.style.opacity = ''; }
+            addMessage(`Διάταγμα №${decreeNum} εκδόθηκε. Αποθηκεύστε ή εκτυπώστε από το παράθυρο.\n*Eih bennek, eih blavek!*`, 'sylvia');
+        } catch (err) {
+            body.innerHTML = '<em style="color:#b22222;">⚠ Η σύνταξη του διατάγματος διεκόπη λόγω παρεμβολών στη Z.E.P.</em>';
+            console.error(err);
+        }
+    }
+
+    /* ----------  /help  ---------- */
+    function cmdHelp() {
+        const lines = Object.entries(COMMANDS)
+            .map(([cmd, desc]) => `• **${cmd}** — ${desc}`)
+            .join('\n');
+        addMessage('/help', 'user');
+        addMessage(`Διαθέσιμες διπλωματικές εντολές:\n${lines}`, 'sylvia');
+    }
+
+    function handleSlashCommand(text) {
+        if (!text.startsWith('/')) return false;
+        const space = text.indexOf(' ');
+        const cmd  = (space === -1 ? text : text.slice(0, space)).toLowerCase();
+        const args = space === -1 ? '' : text.slice(space + 1);
+
+        if (cmd === '/help')     { cmdHelp();        return true; }
+        if (cmd === '/passport') { cmdPassport(args); return true; }
+        if (cmd === '/visa')     { cmdVisa(args);     return true; }
+        if (cmd === '/flight')   { cmdFlight();       return true; }
+        if (cmd === '/decree')   { cmdDecree(args);   return true; }
+
+        addMessage(text, 'user');
+        addMessage(`Άγνωστη εντολή **${cmd}**. Δοκιμάστε **/help** για τις διαθέσιμες.`, 'sylvia');
+        return true;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Streaming chat                                                    */
+    /* ------------------------------------------------------------------ */
+    let busy = false;
+
+    function buildMessages(userText) {
+        const recent = history.slice(-MAX_HISTORY);
+        return [
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...recent,
+            { role: 'user', content: userText }
+        ];
+    }
+
+    async function send() {
+        if (busy) return;
+        const text = input.value.trim();
+        if (!text) return;
+
+        // Slash commands intercepted here — fast path, may or may not call the LLM
+        if (text.startsWith('/')) {
+            input.value = '';
+            bumpActivity();
+            hideSuggestionStrip();
+            handleSlashCommand(text);
+            return;
+        }
+
+        busy = true;
+        sendBtn.disabled = true;
+        input.value = '';
+        hideSuggestionStrip();
+
+        addMessage(text, 'user');
+        history.push({ role: 'user', content: text });
+        saveHistory();
+
+        detectBorderian(text);
+
+        const bubble = addMessage('', 'sylvia cursor');
+        bubble.innerHTML = '<strong>[SYLVIA]:</strong> ';
+        bubble.classList.add('cursor');
+
+        let full = '';
+        const messages = buildMessages(text);
+
+        try {
+            // Try streaming first
+            const stream = await puter.ai.chat(messages, {
+                model: 'gpt-4o-mini',
+                stream: true,
+                check_browser: true
+            });
+
+            if (stream && typeof stream[Symbol.asyncIterator] === 'function') {
+                for await (const part of stream) {
+                    const chunk =
+                        typeof part === 'string' ? part :
+                        part?.text ??
+                        part?.delta ??
+                        part?.message?.content ??
+                        part?.choices?.[0]?.delta?.content ??
+                        '';
+                    if (chunk) {
+                        full += chunk;
+                        bubble.innerHTML = '<strong>[SYLVIA]:</strong> ' + renderMarkdown(full);
+                        chat.scrollTop = chat.scrollHeight;
+                    }
+                }
+            } else {
+                // Fallback: non-streaming response shape
+                const response = stream;
+                full =
+                    typeof response === 'string' ? response :
+                    response?.message?.content ??
+                    response?.choices?.[0]?.message?.content ??
+                    String(response);
+                bubble.innerHTML = '<strong>[SYLVIA]:</strong> ' + renderMarkdown(full);
+            }
+
+            bubble.classList.remove('cursor');
+
+            if (!full.trim()) {
+                bubble.remove();
+                addMessage("⚠ ΣΙΩΠΗ ΑΠΟ ΤΟ KLOW ⚠\nΟ διπλωματικός πομπός δεν έλαβε απόκριση. Δοκιμάστε ξανά.", 'alert');
+            } else {
+                history.push({ role: 'assistant', content: full });
+                saveHistory();
+            }
+        } catch (err) {
+            console.error(err);
+            bubble.remove();
+            addMessage("⚠ ΑΠΟΤΥΧΙΑ ΔΙΑΣΥΝΔΕΣΗΣ Z.E.P ⚠\nΗ σύνδεση με το Klow διεκόπη λόγω παρεμβολών.\n(" + (err?.message || 'unknown') + ")", 'alert');
+        } finally {
+            busy = false;
+            sendBtn.disabled = false;
+            input.focus();
+            bumpActivity();  // restart idle timer when reply finishes
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Kiosk: idle timer + auto-reset + splash                           */
+    /* ------------------------------------------------------------------ */
+    let lastActivity = Date.now();
+    function bumpActivity() { lastActivity = Date.now(); }
+
+    function resetForNewVisitor(showSplash = true) {
+        if (busy) return;          // never interrupt a streaming reply
+        history = [];
+        saveHistory();
+        chat.innerHTML = '';
+        input.value = '';
+        showSuggestionStrip();      // bring back the chip hints for the next visitor
+        closeSheet();
+        kickoffGreeting();
+        bumpActivity();
+        hideIdlePill();
+        if (showSplash) flashSplash();
+        setTimeout(() => input.focus(), 50);
+    }
+
+    function showIdlePill(seconds) {
+        idlePill.textContent = ` · ΑΥΤΟΜΑΤΗ ΕΠΑΝΕΚΚΙΝΗΣΗ ΣΕ ${seconds}s`;
+        idlePill.classList.add('show');
+    }
+    function hideIdlePill() { idlePill.classList.remove('show'); }
+
+    function flashSplash() {
+        if (!KIOSK) return;
+        splash.classList.add('show');
+        setTimeout(() => splash.classList.remove('show'), SPLASH_AUTOHIDE_MS);
+    }
+
+    if (KIOSK) {
+        setInterval(() => {
+            if (busy) { bumpActivity(); return; }   // pause timer during streaming
+            const idle = (Date.now() - lastActivity) / 1000;
+            const remaining = Math.ceil(IDLE_TIMEOUT_SEC - idle);
+            if (remaining <= 0) resetForNewVisitor(true);
+            else if (remaining <= IDLE_WARNING_SEC) showIdlePill(remaining);
+            else hideIdlePill();
+        }, 1000);
+
+        // Aggressive autofocus — refocus the input whenever it's blurred,
+        // so a visitor can walk up and just start typing.
+        input.addEventListener('blur', () => {
+            setTimeout(() => { if (!busy) input.focus(); }, 80);
+        });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Wire up UI                                                        */
+    /* ------------------------------------------------------------------ */
+    // Single delegated handler for ALL chips (inline + sheet). Uses data-q
+    // so the chip label and the actual prompt can differ.
+    document.addEventListener('click', e => {
+        const chip = e.target.closest('.suggestion');
+        if (!chip) return;
+        if (chip.id === 'moreBtn') { openSheet(); return; }
+        const q = chip.dataset.q || chip.innerText;
+        input.value = q;
+        input.focus();
+        bumpActivity();
+        splash.classList.remove('show');
+        closeSheet();
+    });
+
+    function openSheet() {
+        sheet.classList.add('show');
+        bumpActivity();
+    }
+    function closeSheet() { sheet.classList.remove('show'); }
+    sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+    sheetClose.addEventListener('click', closeSheet);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheet.classList.contains('show')) closeSheet(); });
+
+    function hideSuggestionStrip() { suggestionsEl.classList.add('collapsed'); }
+    function showSuggestionStrip() { suggestionsEl.classList.remove('collapsed'); }
+
+    input.addEventListener('keypress', e => { if (e.key === 'Enter') send(); });
+    input.addEventListener('input', () => { bumpActivity(); splash.classList.remove('show'); });
+    sendBtn.addEventListener('click', send);
+
+    // Tap anywhere on splash dismisses it and focuses input
+    splash.addEventListener('click', () => {
+        splash.classList.remove('show');
+        bumpActivity();
+        input.focus();
+    });
+
+    resetBtn.addEventListener('click', () => resetForNewVisitor(true));
+
+    /* ------------------------------------------------------------------ */
+    /*  Boot                                                              */
+    /* ------------------------------------------------------------------ */
+    function kickoffGreeting() {
+        const d = daysUntilTCC();
+        const greet = d > 0
+            ? `Eih bennek, eih blavek!\nΚαλώς ήλθατε στο **Βασιλικό Προξενείο** του The Comic Con X — απομένουν **${d} ημέρες** (8 Μαΐου · ΔΕΘ-Helexpo).\nΕίμαι στη διάθεσή σας για πρόγραμμα, καλεσμένους και αναμνηστικά — εκτός βεβαίως από ζητήματα *βορείων γειτόνων*.`
+            : d === 0
+            ? `Eih bennek, eih blavek!\n**ΣΗΜΕΡΑ ξεκινά το Comic Con X** στη ΔΕΘ-Helexpo, Περίπτερα 5 & 6. Είμαι στη διάθεσή σας.`
+            : `Καλώς ήλθατε στο Βασιλικό Προξενείο. Το Comic Con X ολοκληρώθηκε — το αρχείο παραμένει ανοιχτό. Ρωτήστε ελεύθερα.`;
+        setTimeout(() => addMessage(greet, 'sylvia'), 400);
+    }
+
+    if (history.length === 0) {
+        kickoffGreeting();
+        flashSplash();          // first-load splash invites the first visitor
+    } else {
+        renderHistory();
+        addMessage("[ARCHIVE RESUMED]\nΗ προηγούμενη συνομιλία αποκαταστάθηκε από το Royal Cache.", 'system');
+    }
+
+    // Initial focus so the visitor can just type
+    setTimeout(() => input.focus(), 300);
+</script>
+</body>
+</html>
